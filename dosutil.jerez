@@ -1,0 +1,257 @@
+#!/bin/bash
+#Drake Jerez
+#Purpose: This script takes microsoft DOS commands and converts them into the
+#	  appropriate linux equivalent. This was written for Lab of CNIT 340
+#Last Revised: 11/17/2023
+#Variables:
+#ARG1=the first string after bash command, is script command
+#ARG2=first parameter of the dos command
+#ARG3=second parameter of the dos command
+#SCRIPTPATH=path of the dosutil script
+#TYPE2=file type of the first file
+#TYPE3=file type of the second file
+#FILES=array of ls output for current directory
+
+SCRIPTPATH=$0
+
+#Read Arguments
+ARG1=$1
+ARG2=$2
+ARG3=$3
+
+#function to check file existence and type
+#these variables will record the results, 0:nothing 1: file 2: directory
+TYPE2=0
+TYPE3=0
+
+fileCheck ()
+{
+	#check arg2's type
+	if [[ -n $1 ]]; then
+		if [[ -e $1 ]]; then
+			if [[ -d $1 ]]; then
+				TYPE2=2
+			elif [[ -f $1 ]]; then
+				TYPE2=1
+			fi
+		else
+			TYPE2=0
+			echo Error: File $1 does not exist.
+			exit 1
+		fi
+	fi
+
+	#check arg3's type
+	if [[ -n $2 ]]; then
+		if [[ -e $2 ]]; then
+			if [[ -d $2 ]]; then
+				TYPE3=2
+			elif [[ -f $2 ]]; then
+				TYPE3=1
+			fi
+		else
+			TYPE3=0
+			echo Error: File $2 does not exist.
+			exit 1
+		fi
+	fi
+
+}
+
+#runs the linux command and checks for success/failure
+#CODE=exit code of the command supplied
+execute ()
+{
+
+	#running the command
+	"$@"
+	
+	
+	CODE=$?
+	#checking exit status $?
+	if [[ $CODE == 0 ]]; then
+		echo $'\n'Command ran successfully!
+		echo $'\n'UNIX command ran: $@ $'\n'
+	elif [[ $CODE == 1 ]]; then
+		echo $'\n'Command failed... $'\n'
+	fi
+
+}
+
+#initiates the interactive mode
+#WORK=file to be worked on
+#SORT=sorting option to use
+if [[ $ARG1 == '' ]]; then
+	PS3="Select a sorting method number for file options: "
+	#finding a sorting option, ls sorts by name by default
+	select SORT in name age size none
+	do
+		if [[ $SORT == name ]]; then
+			FILES=($(ls))
+		elif [[ $SORT == age ]]; then
+			FILES=($(ls -t))
+		elif [[ $SORT == size ]]; then
+			FILES=($(ls -S))
+		elif [[ $SORT == none ]]; then
+			FILES=($(ls))
+		fi
+		break
+	done
+	PS3="Select a file number to work on: "; export PS3
+	#finding the file to work on
+	select WORK in ${FILES[@]}
+	do
+		PS3="Select a command number to use: "; export PS3
+		#getting additional file if needed then executing
+		select COMMAND in "type" "copy" 'ren' 'del' 'move' 'help' 'copy!' 'move!' 'ren!'
+		do
+			#getting needed parameters and executing the commands
+			if [[ $COMMAND == copy || $COMMAND == copy! ]]; then
+				echo "Enter a location to copy the file to: "
+				read LOCATION
+				bash $SCRIPTPATH $COMMAND $WORK $LOCATION
+				exit 0
+
+			elif [[ $COMMAND == ren || $COMMAND == ren! ]]; then
+				echo "Enter a new name for the file: "
+				read NAME
+				bash $SCRIPTPATH $COMMAND $WORK $NAME
+				exit 0
+
+			elif [[ $COMMAND == move || $COMMAND == move! ]]; then
+				echo "Enter a location to move the file to: "
+				read LOCATION
+				bash $SCRIPTPATH $COMMAND $WORK $LOCATION
+				exit 0
+			else
+				bash $SCRIPTPATH $COMMAND $WORK
+				exit 0
+			fi
+		done
+	done
+fi
+
+
+#Choose a specific set of operations
+case $ARG1 in
+	#prints author info
+	"author")
+		echo Jerez,Drake
+		;;
+	#prints file contents
+	"type")
+		fileCheck $ARG2
+		if [[ $TYPE2 == 1 ]]; then
+			execute cat $ARG2
+		elif [[ $TYPE2 == 2 ]]; then
+			execute ls $ARG2
+		fi
+		;;
+	#copies a file's contents to a new location
+	"copy")
+		fileCheck $ARG2 $ARG3
+
+		#This checks and exits if there is an overwrite
+		if [[ $TYPE3 == "1" && $ARG2 == $ARG3 ]]; then
+			echo Error: This would overwrite an existing file, $ARG3
+			exit 1
+		elif [[ $TYPE3 == "2" && -e "$ARG3/$ARG2" ]]; then 
+			echo Error: This would overwrite an existing file, "$ARG3/$ARG2"
+			exit 1
+
+		#changing the command used if a dir is being copied
+		elif [[ $TYPE2 == 2 ]]; then
+			execute cp -r $ARG2 $ARG3 2>/dev/null
+		elif [[ $TYPE2 == 1 ]]; then
+			execute cp $ARG2 $ARG3 2>/dev/null
+		fi
+		;;
+	#copies a file's contents to a new location overwriting if there is a clash
+	"copy!")
+		fileCheck $ARG2
+
+		#changing the command used if a dir is being copied
+		if [[ $TYPE2 == 2 ]]; then
+			execute cp -r $ARG2 $ARG3 2>/dev/null
+		elif [[ $TYPE2 == 1 ]]; then
+			execute cp - $ARG2 $ARG3 2>/dev/null
+		fi
+		;;
+	#renames a file
+	"ren")
+	#renaming a directory does not need to be done recursively (mv -r)
+		fileCheck $ARG2
+		if [[ -e $ARG3 ]]; then
+			echo Error: This would overwrite an existing file, $ARG3
+			exit 1
+		else
+			execute mv $ARG2 $ARG3 2>/dev/null
+		fi
+		;;
+	#overwrites the existing file in the rename
+	"ren!")
+		fileCheck $ARG2
+		execute mv -f $ARG2 $ARG3 2>/dev/null
+		;;
+	#moves a file
+	"move")
+		fileCheck $ARG2 $ARG3
+		#checking for overwrties of files then inside directories
+		if [[ $TYPE3 == "1" && -e $ARG3 ]]; then
+			echo Error: This would overwrite an existing file, $ARG3
+			exit 1
+		elif [[ $TYPE3 == "2" && -e "$ARG3/$ARG2" ]]; then
+			echo Error: This would overwrite an existing file, "$ARG3/$ARG2"
+			exit 1
+		#changing the command used based on if a dir is being moved
+		elif [[ $TYPE2 == 1 ]]; then
+			execute	mv $ARG2 $ARG3 2>/dev/null
+		elif [[ $TYPE2 == 2 ]]; then
+			execute mv $ARG2 $ARG3 2>/dev/null
+		fi
+		;;
+	#overwrites the existing file in the move
+	"move!")
+		fileCheck $ARG2 $ARG3
+		#changing the command used based on if a dir is being moved
+		if [[ $TYPE2 == 1 ]]; then
+			execute rm -f "$ARG3/$ARG2" 2>/dev/null
+			execute mv -f $ARG2 $ARG3 2>/dev/null
+		elif [[ $TYPE2 == 2 ]]; then
+			execute rm -r "$ARG3/$ARG2" 2>/dev/null
+			execute mv -f $ARG2 $ARG3 2>/dev/null
+		fi
+		;;
+	#deletes a file
+	"del")
+		fileCheck $ARG2
+		if [[ $TYPE2 == 1 ]]; then
+			execute rm -f $ARG2 2>/dev/null
+		elif [[ $TYPE2 == 2 ]]; then
+			execute rm -rf $ARG2 2>/dev/null
+		fi
+		;;
+	#prints out a help list of commands, actions, syntax
+	"help")
+		echo author - prints out the name of the script author
+		echo type [file] - prints out the file content
+		echo copy [source] [dest] - copies the file to a new location
+		echo copy! [source] [dest] - copies and overwrites the file to a new location
+		echo ren [source] [new name] - renames the file
+		echo ren! [source] [new name] - renames the file, overwriting any other file
+		echo move [source] [dest] - moves the file to a new location
+		echo move! [source] [dest] - moves the file to a new location, overwriting at the new location
+		echo del [file] - deletes the file
+		echo help - prints out this message
+		;;
+	#catches all incorrect inputs and gets the help message
+	*)
+		echo Unknown command $ARG1, please select from the following:
+		bash $SCRIPTPATH help
+		;;
+	
+esac
+
+
+#Successful escape code
+exit 0

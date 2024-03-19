@@ -1,0 +1,73 @@
+#!/bin/bash
+# NAME: Drake Jerez
+# PURPOSE: This script will create and manage backup files based on the config,
+#	   /etc/backup.conf. This was created for lab of CNIT340
+# LAST REVISED: 11/29/2023
+# TO DO: - find a way to echo the assigned variables efficiently?
+#	 - lab phase 2
+
+
+#VARIABLES
+# BACKUP_NAME: parameter given to script for directory to backup
+# VARCONF: array of extracted lines from backup.conf for variables
+# DIRS: extracted line from backup.conf for directory backup details
+# DIRS_VARS: array of variables to assign values for from directory line in 
+#	     backup.conf. Using an associative array would be better
+# ENTRY: value to assign to the directory variables mentioned in DIRS_VARS
+# DIRS_SET: directory variable mentioned in DIRS_VARS to be given a value
+
+
+# Using functions to print out variables to keep script clean
+# Prints out the conf file variables
+print_conf_vars ()
+{
+	echo "COMPRESSION=$COMPRESSION"
+	echo "E_MAIL=$E_MAIL"
+	echo "BACKUP_TARGET=$BACKUP_TARGET"
+	echo "TARGET_TYPE=$TARGET_TYPE"
+	echo "TARGET_SERVER=$TARGET_SERVER"
+	echo "TARGET_FS=$TARGET_FS"
+	echo "USER=$USER"
+	echo "PASSWORD=$PASSWORD"
+}
+
+# Prints out the backup directory : delimitted variables
+print_backup_vars ()
+{
+	echo "NAME=$NAME"
+	echo "DIRECTORY=$DIRECTORY"
+	echo "RECURSIVE=$RECURSIVE"
+	echo "NUM_DAILY=$NUM_DAILY"
+	echo "NUM_WEEKLY=$NUM_WEEKLY"
+	echo "NUM_MONTHLY=$NUM_MONTHLY"
+}
+
+BACKUP_NAME=$1
+
+VARCONF=($(grep -v "#" /etc/backup.conf | grep -E "^[A-Z]"))
+
+# Using the extracted conf file to assign values
+
+for RAW in ${VARCONF[@]}
+do
+	eval $RAW
+done
+
+DIRS=$(grep -v "#" /etc/backup.conf | grep -E "^$BACKUP_NAME")
+
+DIRS_VARS=("NAME" "DIRECTORY" "RECURSIVE" "NUM_DAILY" "NUM_WEEKLY" "NUM_MONTHLY")
+
+# Using the varable names in DIRS_VARS and the extracted DIRS value to assign
+
+for INDEX in $(seq 0 1 5)
+do
+	ENTRY=$(echo "${DIRS}" | cut -f $(($INDEX + 1)) -d ':')
+	DIRS_SET="${DIRS_VARS[$INDEX]}=$ENTRY"
+	eval $DIRS_SET
+done
+
+# Calling print functions
+
+print_conf_vars
+echo -e
+print_backup_vars
